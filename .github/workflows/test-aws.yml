@@ -1,1 +1,30 @@
+name: Test AWS secrets
 
+on:
+  workflow_dispatch: {}   # run manually
+  push:
+    paths:
+      - ".github/workflows/test-aws.yml"
+
+jobs:
+  ping-aws:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Install AWS CLI
+        uses: aws-actions/setup-aws-cli@v4
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
+
+      - name: Optional: list S3 (simple permission test)
+        run: aws s3 ls || true
