@@ -1,16 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Eczema backend infrastructure (DynamoDB, SQS, IAM, Lambda, API Gateway)
+
 Resources:
-  #  DynamoDB tables
+  # ---------------- DynamoDB tables ----------------
   SymptomLogsTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: SymptomLogs_Iac
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
+        - AttributeName: UserId
+          AttributeType: S
         - AttributeName: id
           AttributeType: S
       KeySchema:
+        - AttributeName: UserId
+          KeyType: HASH    # partition key
         - AttributeName: id
-          KeyType: HASH
+          KeyType: RANGE   # sort key
 
   EnvCacheTable:
     Type: AWS::DynamoDB::Table
@@ -23,14 +30,17 @@ Resources:
       KeySchema:
         - AttributeName: city
           KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
 
-  # SQS queue
+  # ---------------- SQS queue ----------------
   SymptomQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: SymptomQueue_Iac
 
-  # IAM roles 
+  # ---------------- IAM role for all Lambdas ----------------
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -49,15 +59,191 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
         - arn:aws:iam::aws:policy/AmazonSQSFullAccess
 
+  # ---------------- Lambda functions (skeletons) ----------------
+  EnvironmentDataLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: EnvironmentDataFunction_Iac
+      Runtime: nodejs22.x
+      Handler: index.handler        
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 256
+      Environment:
+        Variables:
+          ENV_CACHE_TABLE: !Ref EnvCacheTable
+      Code:
+        ZipFile: |
+          export const handler = async (event) => {
+            console.log("Placeholder EnvironmentDataLambda", JSON.stringify(event));
+            return { statusCode: 200, body: JSON.stringify({ message: "placeholder" }) };
+          };
 
+  SymptomLogsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SymptomLogsFunction_Iac
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 256
+      Environment:
+        Variables:
+          SYMPTOM_TABLE: !Ref SymptomLogsTable
+          SYMPTOM_QUEUE_URL: !Ref SymptomQueue
+      Code:
+        ZipFile: |
+          export const handler = async (event) => {
+            console.log("Placeholder SymptomLogsLambda", JSON.stringify(event));
+            return { statusCode: 202, body: JSON.stringify({ message: "queued (placeholder)" }) };
+          };
+
+  SymptomConsumerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: SymptomConsumerFunction_Iac
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          SYMPTOM_TABLE: !Ref SymptomLogsTable
+      Code:
+        ZipFile: |
+          export const handler = async (event) => {
+            console.log("Placeholder SymptomConsumerLambda", JSON.stringify(event));
+            return {};
+          };
+
+  # Event source mapping so consumer reads from SQS
+  SymptomQueueEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt SymptomQueue.Arn
+      FunctionName: !Ref SymptomConsumerLambda
+      BatchSize: 10
+      Enabled: true
+
+  # ---------------- API Gateway (REST) ----------------
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: EczemaBackendApi_Iac
 
+  # /LiveEnvironmentDataFunction
+  LiveEnvResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: LiveEnvironmentDataFunction
+
+  LiveEnvPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref LiveEnvResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EnvironmentDataLambda.Arn}/invocations
+
+  # /SymptomLogsFunction
+  SymptomLogsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: SymptomLogsFunction
+
+  SymptomLogsAnyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SymptomLogsResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SymptomLogsLambda.Arn}/invocations
+
+  # /SymptomLogsFunction/{id} DELETE
+  SymptomLogsIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref SymptomLogsResource
+      PathPart: "{id}"
+
+  SymptomLogsIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SymptomLogsIdResource
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SymptomLogsLambda.Arn}/invocations
+
+  # Permissions for API Gateway to call Lambdas
+  EnvironmentLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EnvironmentDataLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub >
+        arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/LiveEnvironmentDataFunction
+
+  SymptomLogsLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SymptomLogsLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub >
+        arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}///SymptomLogsFunction*
+
+  # Deployment + stage
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - LiveEnvPostMethod
+      - SymptomLogsAnyMethod
+      - SymptomLogsIdDeleteMethod
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: prod
+
 Outputs:
-  ApiId:
-    Value: !Ref ApiGatewayRestApi
-    Export:
-      Name: EczemaBackendApiId
+  LambdaExecutionRoleArn:
+    Description: IAM role ARN used by Lambda functions
+    Value: !GetAtt LambdaExecutionRole.Arn
+
+  EnvironmentDataLambdaArn:
+    Description: Environment Lambda ARN
+    Value: !GetAtt EnvironmentDataLambda.Arn
+
+  SymptomLogsLambdaArn:
+    Description: Symptom logs Lambda ARN
+    Value: !GetAtt SymptomLogsLambda.Arn
+
+  SymptomConsumerLambdaArn:
+    Description: Symptom consumer Lambda ARN
+    Value: !GetAtt SymptomConsumerLambda.Arn
+
+  ApiBaseUrl:
+    Description: Base invoke URL for the prod stage
+    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
 
