@@ -22,4 +22,6 @@ jobs:
          aws cloudformation deploy \
           --template-file backend.yml \
           --stack-name BackendStack \
+          --capabilities CAPABILITY_NAMED_IAM
+
         
