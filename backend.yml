@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Eczema backend infrastructure (DynamoDB, SQS, IAM, Lambda, API Gateway)
 
-Resources: 
-  # ---------------- DynamoDB tables -----------------
+Resources:
+  # ---------------- DynamoDB tables ----------------
   SymptomLogsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -65,7 +65,7 @@ Resources:
     Properties:
       FunctionName: EnvironmentDataFunction_Iac
       Runtime: nodejs22.x
-      Handler: index.handler        
+      Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 15
       MemorySize: 256
@@ -151,8 +151,9 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub >
-          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${EnvironmentDataLambda.Arn}/invocations
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { LambdaArn: !GetAtt EnvironmentDataLambda.Arn }
 
   # /SymptomLogsFunction
   SymptomLogsResource:
@@ -172,8 +173,9 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub >
-          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SymptomLogsLambda.Arn}/invocations
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { LambdaArn: !GetAtt SymptomLogsLambda.Arn }
 
   # /SymptomLogsFunction/{id} DELETE
   SymptomLogsIdResource:
@@ -193,18 +195,18 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub >
-          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SymptomLogsLambda.Arn}/invocations
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { LambdaArn: !GetAtt SymptomLogsLambda.Arn }
 
-  # -------- Permissions for API Gateway to call Lambdas --------
+  # Permissions for API Gateway to call Lambdas
   EnvironmentLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref EnvironmentDataLambda
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      # Allow any stage / method / path of this API to invoke the Lambda
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}///*
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/LiveEnvironmentDataFunction
 
   SymptomLogsLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -212,10 +214,9 @@ Resources:
       FunctionName: !Ref SymptomLogsLambda
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      # Same wildcard pattern for the symptom logs Lambda
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}///*
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}///SymptomLogsFunction*
 
-  # ---------------- Deployment + stage ----------------
+  # Deployment + stage
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
