@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Eczema backend infrastructure (DynamoDB, SQS, IAM, Lambda, API Gateway)
 
 Resources: 
-  # ---------------- DynamoDB tables ----------------
+  # ---------------- DynamoDB tables -----------------
   SymptomLogsTable:
     Type: AWS::DynamoDB::Table
     Properties:
