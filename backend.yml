@@ -91,7 +91,7 @@ Resources:
       Environment:
         Variables:
           SYMPTOM_TABLE: !Ref SymptomLogsTable
-          SYMPTOM_QUEUE_URL: !Ref SymptomQueue
+          SYMPTOM_LOG_QUEUE_URL: !Ref SymptomQueue
       Code:
         ZipFile: |
           export const handler = async (event) => {
