@@ -25,10 +25,10 @@ Resources:
       TableName: EnvCache_Iac
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: cityKey
+        - AttributeName: city
           AttributeType: S
       KeySchema:
-        - AttributeName: cityKey
+        - AttributeName: city
           KeyType: HASH
       TimeToLiveSpecification:
         AttributeName: ttl
