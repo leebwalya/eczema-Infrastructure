@@ -127,35 +127,35 @@ Resources:
       BatchSize: 10
       Enabled: true
 
-  #----------------------COGNITO--------------------------
-CognitoUserPool:
-  Type: AWS::Cognito::UserPool
-  Properties:
-    UserPoolName: EczemaUserPool
-    AutoVerifiedAttributes:
-      - email
-    UsernameAttributes:
-      - email
-    Policies:
-      PasswordPolicy:
-        MinimumLength: 8
-        RequireUppercase: false
-        RequireLowercase: false
-        RequireNumbers: false
-        RequireSymbols: false
+#----------------------COGNITO--------------------------
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: EczemaUserPool
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: EczemaUserPoolClient
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
 
-CognitoUserPoolClient:
-  Type: AWS::Cognito::UserPoolClient
-  Properties:
-    ClientName: EczemaUserPoolClient
-    UserPoolId: !Ref CognitoUserPool
-    GenerateSecret: false
-    ExplicitAuthFlows:
-      - ALLOW_USER_SRP_AUTH
-      - ALLOW_REFRESH_TOKEN_AUTH
 
-
-  # ---------------- API Gateway (REST) ----------------
+# ---------------- API Gateway (REST) ----------------
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
