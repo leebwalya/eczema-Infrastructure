@@ -1,7 +1,7 @@
 name: Deploy IAC Stack
 
 on: push
-         
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
