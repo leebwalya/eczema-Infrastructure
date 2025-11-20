@@ -78,6 +78,14 @@ Resources:
             console.log("Placeholder EnvironmentDataLambda", JSON.stringify(event));
             return { statusCode: 200, body: JSON.stringify({ message: "placeholder" }) };
           };
+  EnvironmentDataLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt EnvironmentDataLambda.Arn
+        Action: lambda:InvokeFunction
+        Principal: apigateway.amazonaws.com
+        SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/*
+
 
   SymptomLogsLambda:
     Type: AWS::Lambda::Function
