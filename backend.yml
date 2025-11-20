@@ -320,9 +320,13 @@ Resources:
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - LiveEnvPostMethod
+      - LiveEnvAnyMethod
+      - LiveEnvOptionsMethod
       - SymptomLogsAnyMethod
       - SymptomLogsIdDeleteMethod
+      - SymptomLogsOptionsMethod
+      - SymptomLogsIdOptionsMethod
+
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       StageName: prod
