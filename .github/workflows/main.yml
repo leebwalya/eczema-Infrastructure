@@ -1,5 +1,4 @@
 name: Deploy IAC Stack
-
 on: push
 
 jobs:
